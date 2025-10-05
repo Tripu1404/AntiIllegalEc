@@ -1,0 +1,5 @@
+name: EnchantControl
+main: com.tripu1404.enchantcontrol.EnchantControl
+version: 1.0
+api: 5.0.0
+author: tripu1404
