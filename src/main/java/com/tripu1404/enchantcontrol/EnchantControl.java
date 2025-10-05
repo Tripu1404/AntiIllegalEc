@@ -7,6 +7,7 @@ import cn.nukkit.event.player.PlayerJoinEvent;
 import cn.nukkit.event.inventory.InventoryOpenEvent;
 import cn.nukkit.event.inventory.InventoryClickEvent;
 import cn.nukkit.inventory.Inventory;
+import cn.nukkit.inventory.PlayerInventory;
 import cn.nukkit.item.Item;
 import cn.nukkit.plugin.PluginBase;
 import cn.nukkit.nbt.tag.CompoundTag;
@@ -14,6 +15,7 @@ import cn.nukkit.nbt.tag.ListTag;
 
 public class EnchantControl extends PluginBase implements Listener {
 
+    // IDs de encantamientos
     private static final int PROTECTION = 0;
     private static final int FIRE_PROTECTION = 1;
     private static final int FEATHER_FALLING = 2;
@@ -140,8 +142,9 @@ public class EnchantControl extends PluginBase implements Listener {
         }
 
         if (player != null && changed) {
-            player.getInventory().setArmorItem(armorSlot, item);
-            player.getInventory().sendArmorContents(player);
+            PlayerInventory inv = player.getInventory();
+            inv.setArmorItem(armorSlot, item);       // Actualiza solo la pieza de armadura
+            inv.sendArmorContents(player);           // Envia solo armadura, no todo el inventario
         }
 
         return changed;
@@ -200,25 +203,17 @@ public class EnchantControl extends PluginBase implements Listener {
     @EventHandler
     public void onJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
-        getServer().getScheduler().scheduleDelayedTask(this, () -> {
-            boolean changed = false;
-            for (Item i : player.getInventory().getContents().values()) if (fixItem(i)) changed = true;
-            for (int slot = 0; slot < 4; slot++) {
-                Item armor = player.getInventory().getArmorItem(slot);
-                if (armor != null && !armor.isNull()) {
-                    if (fixArmor(armor, player, slot)) changed = true;
-                }
-            }
-            if (changed) player.getInventory().sendContents(player);
-        }, 1);
+        for (Item i : player.getInventory().getContents().values()) fixItem(i);
+        for (int slot = 0; slot < 4; slot++) {
+            Item armor = player.getInventory().getArmorItem(slot);
+            if (armor != null && !armor.isNull()) fixArmor(armor, player, slot);
+        }
     }
 
     @EventHandler
     public void onInventoryOpen(InventoryOpenEvent event) {
         Inventory inv = event.getInventory();
-        getServer().getScheduler().scheduleDelayedTask(this, () -> {
-            for (Item i : inv.getContents().values()) fixItem(i);
-        }, 1);
+        for (Item i : inv.getContents().values()) fixItem(i);
     }
 
     @EventHandler
@@ -229,13 +224,13 @@ public class EnchantControl extends PluginBase implements Listener {
         Item i = inv.getItem(slot);
         if (i != null && !i.isNull()) fixItem(i);
 
-        // Corregir armaduras si se mueve a slots de armadura
+        // Revisar solo armaduras equipadas
         if (p != null) {
+            PlayerInventory pinv = p.getInventory();
             for (int armorSlot = 0; armorSlot < 4; armorSlot++) {
-                Item armor = p.getInventory().getArmorItem(armorSlot);
+                Item armor = pinv.getArmorItem(armorSlot);
                 if (armor != null && !armor.isNull()) fixArmor(armor, p, armorSlot);
             }
-            p.getInventory().sendContents(p);
         }
     }
 }
