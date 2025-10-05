@@ -4,7 +4,6 @@ import cn.nukkit.Player;
 import cn.nukkit.event.Listener;
 import cn.nukkit.event.EventHandler;
 import cn.nukkit.event.player.PlayerJoinEvent;
-import cn.nukkit.event.player.PlayerArmorChangeEvent;
 import cn.nukkit.event.inventory.InventoryOpenEvent;
 import cn.nukkit.event.inventory.InventoryClickEvent;
 import cn.nukkit.inventory.Inventory;
@@ -42,6 +41,7 @@ public class EnchantControl extends PluginBase implements Listener {
         getLogger().info("EnchantControl habilitado correctamente.");
     }
 
+    // --- NBT Utilities ---
     private CompoundTag getOrCreateTag(Item item) {
         CompoundTag tag = item.getNamedTag();
         if (tag == null) {
@@ -75,6 +75,7 @@ public class EnchantControl extends PluginBase implements Listener {
         return false;
     }
 
+    // --- Item Fixers ---
     private boolean fixItem(Item item) {
         if (item == null || item.isNull()) return false;
         boolean changed = false;
@@ -213,14 +214,6 @@ public class EnchantControl extends PluginBase implements Listener {
     }
 
     @EventHandler
-    public void onArmorChange(PlayerArmorChangeEvent event) {
-        Player player = event.getPlayer();
-        int slot = event.getSlot();
-        Item newArmor = event.getNewArmor();
-        if (newArmor != null && !newArmor.isNull()) fixArmor(newArmor, player, slot);
-    }
-
-    @EventHandler
     public void onInventoryOpen(InventoryOpenEvent event) {
         Inventory inv = event.getInventory();
         getServer().getScheduler().scheduleDelayedTask(this, () -> {
@@ -234,13 +227,15 @@ public class EnchantControl extends PluginBase implements Listener {
         Inventory inv = event.getInventory();
         int slot = event.getSlot();
         Item i = inv.getItem(slot);
-        if (i == null || i.isNull()) return;
+        if (i != null && !i.isNull()) fixItem(i);
 
-        getServer().getScheduler().scheduleDelayedTask(this, () -> {
-            if (fixItem(i)) {
-                inv.setItem(slot, i);
-                if (p != null && p.isOnline()) p.getInventory().sendContents(p);
+        // Corregir armaduras si se mueve a slots de armadura
+        if (p != null) {
+            for (int armorSlot = 0; armorSlot < 4; armorSlot++) {
+                Item armor = p.getInventory().getArmorItem(armorSlot);
+                if (armor != null && !armor.isNull()) fixArmor(armor, p, armorSlot);
             }
-        }, 1);
+            p.getInventory().sendContents(p);
+        }
     }
 }
