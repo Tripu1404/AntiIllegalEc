@@ -38,165 +38,190 @@ public class EnchantControl extends PluginBase implements Listener {
     @Override
     public void onEnable() {
         getServer().getPluginManager().registerEvents(this, this);
-        getLogger().info("EnchantControl habilitado!");
+        getLogger().info("EnchantControl habilitado correctamente.");
     }
 
-    private void fixItem(Item item) {
-        if (item == null || item.isNull()) return;
+    private boolean fixItem(Item item) {
+        if (item == null || item.isNull()) return false;
+
+        boolean changed = false;
 
         if (isArmor(item)) {
-            fixArmor(item);
+            changed = fixArmor(item);
         } else {
-            fixNonArmor(item);
+            changed = fixNonArmor(item);
         }
+
+        return changed;
     }
 
     private boolean isArmor(Item item) {
         int id = item.getId();
-        return (id >= 298 && id <= 317); // casco, pechera, pantalón, botas
+        return (id >= 298 && id <= 317);
     }
 
-    private void fixArmor(Item item) {
+    private boolean fixArmor(Item item) {
+        boolean changed = false;
         Enchantment[] enchants = item.getEnchantments();
-        if (enchants != null) {
-            for (Enchantment e : enchants) {
-                e.setLevel(0); // eliminar todos
-            }
-        }
 
-        int[] allowed = {PROTECTION, FIRE_PROTECTION, FEATHER_FALLING, BLAST_PROTECTION,
-                PROJECTILE_PROTECTION, THORNS, UNBREAKING, CURSE_OF_VANISHING, MENDING};
+        if (enchants == null || enchants.length == 0) return false;
 
         int id = item.getId();
-        if (id == 298 || id == 302 || id == 306 || id == 310 || id == 314) { // casco
+        int[] allowed = {
+                PROTECTION, FIRE_PROTECTION, FEATHER_FALLING, BLAST_PROTECTION,
+                PROJECTILE_PROTECTION, THORNS, UNBREAKING, CURSE_OF_VANISHING, MENDING
+        };
+
+        if (id == 298 || id == 302 || id == 306 || id == 310 || id == 314) {
             allowed = new int[]{PROTECTION, FIRE_PROTECTION, FEATHER_FALLING, BLAST_PROTECTION,
                     PROJECTILE_PROTECTION, THORNS, UNBREAKING, CURSE_OF_VANISHING, MENDING,
                     RESPIRATION, AQUA_AFFINITY};
-        } else if (id == 300 || id == 304 || id == 308 || id == 312 || id == 316) { // pantalón
+        } else if (id == 300 || id == 304 || id == 308 || id == 312 || id == 316) {
             allowed = new int[]{PROTECTION, FIRE_PROTECTION, FEATHER_FALLING, BLAST_PROTECTION,
                     PROJECTILE_PROTECTION, THORNS, UNBREAKING, CURSE_OF_VANISHING, MENDING,
                     SWIFT_SNEAK};
-        } else if (id == 301 || id == 305 || id == 309 || id == 313 || id == 317) { // botas
+        } else if (id == 301 || id == 305 || id == 309 || id == 313 || id == 317) {
             allowed = new int[]{PROTECTION, FIRE_PROTECTION, FEATHER_FALLING, BLAST_PROTECTION,
                     PROJECTILE_PROTECTION, THORNS, UNBREAKING, CURSE_OF_VANISHING, MENDING,
                     DEPTH_STRIDER, FROST_WALKER, SOUL_SPEED};
         }
 
-        // reaplicar solo permitidos
-        if (enchants != null) {
-            for (Enchantment e : enchants) {
-                for (int a : allowed) {
-                    if (e.getId() == a) {
-                        Enchantment ne = Enchantment.getEnchantment(a);
-                        ne.setLevel(e.getLevel());
-                        item.addEnchantment(ne);
-                    }
+        for (Enchantment e : enchants) {
+            boolean allowedEnchant = false;
+            for (int a : allowed) {
+                if (e.getId() == a) {
+                    allowedEnchant = true;
+                    break;
                 }
+            }
+            if (!allowedEnchant) {
+                item.removeEnchantment(e.getId());
+                changed = true;
             }
         }
 
-        applyArmorPriorities(item);
-    }
+        // Reglas de compatibilidad
+        if (item.hasEnchantment(FROST_WALKER) && item.hasEnchantment(DEPTH_STRIDER)) {
+            item.removeEnchantment(FROST_WALKER);
+            changed = true;
+        }
 
-    private void applyArmorPriorities(Item item) {
-        int[] priority = {PROTECTION, BLAST_PROTECTION, FIRE_PROTECTION, PROJECTILE_PROTECTION};
+        // Solo uno de los tipos de protección
+        int[] protectionGroup = {PROTECTION, BLAST_PROTECTION, FIRE_PROTECTION, PROJECTILE_PROTECTION};
         int keep = -1;
-        for (int id : priority) {
-            if (item.hasEnchantment(id)) {
-                keep = id;
+        for (int pid : protectionGroup) {
+            if (item.hasEnchantment(pid)) {
+                keep = pid;
                 break;
             }
         }
         if (keep != -1) {
-            for (int id : priority) {
-                if (id != keep && item.hasEnchantment(id)) {
-                    Enchantment e = Enchantment.getEnchantment(id);
-                    e.setLevel(0);
+            for (int pid : protectionGroup) {
+                if (pid != keep && item.hasEnchantment(pid)) {
+                    item.removeEnchantment(pid);
+                    changed = true;
                 }
             }
         }
 
-        if (item.hasEnchantment(FROST_WALKER) && item.hasEnchantment(DEPTH_STRIDER)) {
-            Enchantment e = Enchantment.getEnchantment(FROST_WALKER);
-            e.setLevel(0);
-        }
+        return changed;
     }
 
-    private void fixNonArmor(Item item) {
-        if (item == null || item.isNull()) return;
+    private boolean fixNonArmor(Item item) {
+        boolean changed = false;
+        int id = item.getId();
 
-        switch (item.getId()) {
+        switch (id) {
             case Item.BOW:
-                handleMendingInfinity(item);
+                if (item.hasEnchantment(MENDING) && item.hasEnchantment(INFINITY)) {
+                    item.removeEnchantment(MENDING);
+                    changed = true;
+                }
                 break;
+
             case Item.DIAMOND_PICKAXE:
             case Item.NETHERITE_PICKAXE:
             case Item.IRON_PICKAXE:
             case Item.GOLD_PICKAXE:
             case Item.STONE_PICKAXE:
             case Item.WOODEN_PICKAXE:
-                handleSilkFortune(item);
+                if (item.hasEnchantment(SILK_TOUCH) && item.hasEnchantment(FORTUNE)) {
+                    item.removeEnchantment(FORTUNE);
+                    changed = true;
+                }
                 break;
+
             case Item.DIAMOND_AXE:
             case Item.NETHERITE_AXE:
             case Item.IRON_AXE:
             case Item.GOLD_AXE:
             case Item.STONE_AXE:
             case Item.WOODEN_AXE:
-                removeEnchantment(item, FIRE_ASPECT);
+                if (item.hasEnchantment(FIRE_ASPECT)) {
+                    item.removeEnchantment(FIRE_ASPECT);
+                    changed = true;
+                }
                 break;
+
             case Item.TRIDENT:
-                removeEnchantment(item, FIRE_ASPECT);
-                removeEnchantment(item, SHARPNESS);
+                if (item.hasEnchantment(FIRE_ASPECT) || item.hasEnchantment(SHARPNESS)) {
+                    item.removeEnchantment(FIRE_ASPECT);
+                    item.removeEnchantment(SHARPNESS);
+                    changed = true;
+                }
                 break;
+
             case Item.ELYTRA:
-                removeEnchantment(item, PROTECTION);
-                removeEnchantment(item, FIRE_PROTECTION);
-                removeEnchantment(item, FEATHER_FALLING);
-                removeEnchantment(item, BLAST_PROTECTION);
-                removeEnchantment(item, PROJECTILE_PROTECTION);
+                int[] invalid = {PROTECTION, FIRE_PROTECTION, FEATHER_FALLING, BLAST_PROTECTION, PROJECTILE_PROTECTION};
+                for (int pid : invalid) {
+                    if (item.hasEnchantment(pid)) {
+                        item.removeEnchantment(pid);
+                        changed = true;
+                    }
+                }
                 break;
         }
+
+        return changed;
     }
 
-    private void handleMendingInfinity(Item item) {
-        boolean hasMending = item.hasEnchantment(MENDING);
-        boolean hasInfinity = item.hasEnchantment(INFINITY);
-        if (hasMending && hasInfinity) removeEnchantment(item, MENDING);
-    }
-
-    private void handleSilkFortune(Item item) {
-        boolean hasSilk = item.hasEnchantment(SILK_TOUCH);
-        boolean hasFortune = item.hasEnchantment(FORTUNE);
-        if (hasSilk && hasFortune) removeEnchantment(item, FORTUNE);
-    }
-
-    private void removeEnchantment(Item item, int id) {
-        if (item.hasEnchantment(id)) {
-            Enchantment e = Enchantment.getEnchantment(id);
-            e.setLevel(0);
-        }
-    }
+    // --- EVENTOS ---
 
     @EventHandler
     public void onJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
-        for (Item i : player.getInventory().getContents().values()) fixItem(i);
-        for (Item i : player.getInventory().getArmorContents()) fixItem(i);
+        getServer().getScheduler().scheduleDelayedTask(this, () -> {
+            boolean changed = false;
+            for (Item i : player.getInventory().getContents().values()) if (fixItem(i)) changed = true;
+            for (Item i : player.getInventory().getArmorContents()) if (fixItem(i)) changed = true;
+            if (changed) player.getInventory().sendContents(player);
+        }, 1);
     }
 
     @EventHandler
     public void onInventoryOpen(InventoryOpenEvent event) {
         Inventory inv = event.getInventory();
-        for (Item i : inv.getContents().values()) fixItem(i);
+        getServer().getScheduler().scheduleDelayedTask(this, () -> {
+            for (Item i : inv.getContents().values()) fixItem(i);
+        }, 1);
     }
 
     @EventHandler
     public void onInventoryClick(InventoryClickEvent event) {
+        Player p = event.getPlayer();
         Inventory inv = event.getInventory();
         int slot = event.getSlot();
         Item i = inv.getItem(slot);
-        fixItem(i);
-        inv.setItem(slot, i);
+
+        if (i == null || i.isNull()) return;
+
+        getServer().getScheduler().scheduleDelayedTask(this, () -> {
+            if (fixItem(i)) {
+                inv.setItem(slot, i);
+                if (p != null && p.isOnline()) {
+                    p.getInventory().sendSlot(slot, i);
+                }
+            }
+        }, 1);
     }
 }
