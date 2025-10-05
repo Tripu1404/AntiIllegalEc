@@ -44,8 +44,17 @@ public class EnchantControl extends PluginBase implements Listener {
 
     // --- UTILIDADES NBT ---
 
-    private void removeEnchantmentById(Item item, int id) {
+    private CompoundTag getOrCreateTag(Item item) {
         CompoundTag tag = item.getNamedTag();
+        if (tag == null) {
+            tag = new CompoundTag();
+            item.setNamedTag(tag);
+        }
+        return tag;
+    }
+
+    private void removeEnchantmentById(Item item, int id) {
+        CompoundTag tag = getOrCreateTag(item);
         if (!tag.contains("ench")) return;
 
         ListTag<CompoundTag> enchList = tag.getList("ench", CompoundTag.class);
@@ -59,7 +68,7 @@ public class EnchantControl extends PluginBase implements Listener {
     }
 
     private boolean hasEnchantment(Item item, int id) {
-        CompoundTag tag = item.getNamedTag();
+        CompoundTag tag = getOrCreateTag(item);
         if (!tag.contains("ench")) return false;
         ListTag<CompoundTag> enchList = tag.getList("ench", CompoundTag.class);
         for (int i = 0; i < enchList.size(); i++) {
@@ -74,9 +83,7 @@ public class EnchantControl extends PluginBase implements Listener {
         if (item == null || item.isNull()) return false;
         boolean changed = false;
 
-        if (isArmor(item)) {
-            changed = false; // Armaduras se manejan aparte con fixArmor
-        } else {
+        if (!isArmor(item)) {
             changed = fixNonArmor(item);
         }
 
@@ -111,7 +118,7 @@ public class EnchantControl extends PluginBase implements Listener {
         }
 
         // Filtrar todos los encantamientos
-        CompoundTag tag = item.getNamedTag();
+        CompoundTag tag = getOrCreateTag(item);
         if (tag.contains("ench")) {
             ListTag<CompoundTag> enchList = tag.getList("ench", CompoundTag.class);
             ListTag<CompoundTag> newList = new ListTag<>("ench");
@@ -212,7 +219,9 @@ public class EnchantControl extends PluginBase implements Listener {
             for (Item i : player.getInventory().getContents().values()) if (fixItem(i)) changed = true;
             for (int slot = 0; slot < 4; slot++) { // Armadura
                 Item armor = player.getInventory().getArmorItem(slot);
-                if (fixArmor(armor, player, slot)) changed = true;
+                if (armor != null && !armor.isNull()) {
+                    if (fixArmor(armor, player, slot)) changed = true;
+                }
             }
             if (changed) player.getInventory().sendContents(player);
         }, 1);
@@ -236,10 +245,4 @@ public class EnchantControl extends PluginBase implements Listener {
 
         getServer().getScheduler().scheduleDelayedTask(this, () -> {
             if (fixItem(i)) {
-                inv.setItem(slot, i);
-                if (p != null && p.isOnline()) p.getInventory().sendContents(p);
-            }
-        }, 1);
-    }
-
-} // <- fin de clase
+               
