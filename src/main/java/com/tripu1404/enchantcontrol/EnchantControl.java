@@ -10,9 +10,10 @@ import cn.nukkit.inventory.Inventory;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.enchantment.Enchantment;
 import cn.nukkit.plugin.PluginBase;
+import cn.nukkit.nbt.tag.CompoundTag;
+import cn.nukkit.nbt.tag.ListTag;
 
 import java.util.ArrayList;
-import java.util.List;
 
 public class EnchantControl extends PluginBase implements Listener {
 
@@ -43,6 +44,33 @@ public class EnchantControl extends PluginBase implements Listener {
         getLogger().info("EnchantControl habilitado correctamente.");
     }
 
+    // --- UTILIDADES NBT ---
+
+    private void removeEnchantmentById(Item item, int id) {
+        CompoundTag tag = item.getNamedTag();
+        if (!tag.contains("ench")) return;
+
+        ListTag<CompoundTag> enchList = tag.getList("ench", CompoundTag.class);
+        ListTag<CompoundTag> newList = new ListTag<>("ench");
+        for (CompoundTag e : enchList) {
+            if (e.getShort("id") != id) newList.add(e);
+        }
+        tag.putList(newList);
+        item.setNamedTag(tag);
+    }
+
+    private boolean hasEnchantment(Item item, int id) {
+        CompoundTag tag = item.getNamedTag();
+        if (!tag.contains("ench")) return false;
+        ListTag<CompoundTag> enchList = tag.getList("ench", CompoundTag.class);
+        for (CompoundTag e : enchList) {
+            if (e.getShort("id") == id) return true;
+        }
+        return false;
+    }
+
+    // --- LÓGICA DE ENCANTAMIENTOS ---
+
     private boolean fixItem(Item item) {
         if (item == null || item.isNull()) return false;
         boolean changed = false;
@@ -63,15 +91,10 @@ public class EnchantControl extends PluginBase implements Listener {
 
     private boolean fixArmor(Item item) {
         boolean changed = false;
-        Enchantment[] enchants = item.getEnchantments();
-
-        if (enchants == null || enchants.length == 0) return false;
-
         int id = item.getId();
-        int[] allowed = {
-                PROTECTION, FIRE_PROTECTION, FEATHER_FALLING, BLAST_PROTECTION,
-                PROJECTILE_PROTECTION, THORNS, UNBREAKING, CURSE_OF_VANISHING, MENDING
-        };
+
+        int[] allowed = {PROTECTION, FIRE_PROTECTION, FEATHER_FALLING, BLAST_PROTECTION,
+                PROJECTILE_PROTECTION, THORNS, UNBREAKING, CURSE_OF_VANISHING, MENDING};
 
         if (id == 298 || id == 302 || id == 306 || id == 310 || id == 314) {
             allowed = new int[]{PROTECTION, FIRE_PROTECTION, FEATHER_FALLING, BLAST_PROTECTION,
@@ -87,23 +110,23 @@ public class EnchantControl extends PluginBase implements Listener {
                     DEPTH_STRIDER, FROST_WALKER, SOUL_SPEED};
         }
 
-        // eliminar los no permitidos
-        for (Enchantment e : enchants) {
-            boolean allowedEnchant = false;
-            for (int a : allowed) {
-                if (e.getId() == a) {
-                    allowedEnchant = true;
-                    break;
-                }
+        // Revisar cada encantamiento y eliminar los no permitidos
+        CompoundTag tag = item.getNamedTag();
+        if (tag.contains("ench")) {
+            ListTag<CompoundTag> enchList = tag.getList("ench", CompoundTag.class);
+            ListTag<CompoundTag> newList = new ListTag<>("ench");
+            for (CompoundTag e : enchList) {
+                boolean allowedEnchant = false;
+                int eid = e.getShort("id");
+                for (int a : allowed) if (eid == a) allowedEnchant = true;
+                if (allowedEnchant) newList.add(e); else changed = true;
             }
-            if (!allowedEnchant) {
-                removeEnchantmentById(item, e.getId());
-                changed = true;
-            }
+            tag.putList(newList);
+            item.setNamedTag(tag);
         }
 
         // FROST_WALKER + DEPTH_STRIDER incompatibles
-        if (item.hasEnchantment(FROST_WALKER) && item.hasEnchantment(DEPTH_STRIDER)) {
+        if (hasEnchantment(item, FROST_WALKER) && hasEnchantment(item, DEPTH_STRIDER)) {
             removeEnchantmentById(item, FROST_WALKER);
             changed = true;
         }
@@ -111,19 +134,10 @@ public class EnchantControl extends PluginBase implements Listener {
         // Solo una protección
         int[] protGroup = {PROTECTION, BLAST_PROTECTION, FIRE_PROTECTION, PROJECTILE_PROTECTION};
         int keep = -1;
-        for (int pid : protGroup) {
-            if (item.hasEnchantment(pid)) {
-                keep = pid;
-                break;
-            }
-        }
-        if (keep != -1) {
-            for (int pid : protGroup) {
-                if (pid != keep && item.hasEnchantment(pid)) {
-                    removeEnchantmentById(item, pid);
-                    changed = true;
-                }
-            }
+        for (int pid : protGroup) if (hasEnchantment(item, pid)) { keep = pid; break; }
+        if (keep != -1) for (int pid : protGroup) if (pid != keep && hasEnchantment(item, pid)) {
+            removeEnchantmentById(item, pid);
+            changed = true;
         }
 
         return changed;
@@ -135,65 +149,51 @@ public class EnchantControl extends PluginBase implements Listener {
 
         switch (id) {
             case Item.BOW:
-                if (item.hasEnchantment(MENDING) && item.hasEnchantment(INFINITY)) {
+                if (hasEnchantment(item, MENDING) && hasEnchantment(item, INFINITY)) {
                     removeEnchantmentById(item, MENDING);
                     changed = true;
                 }
                 break;
+
             case Item.DIAMOND_PICKAXE:
             case Item.NETHERITE_PICKAXE:
             case Item.IRON_PICKAXE:
             case Item.GOLD_PICKAXE:
             case Item.STONE_PICKAXE:
             case Item.WOODEN_PICKAXE:
-                if (item.hasEnchantment(SILK_TOUCH) && item.hasEnchantment(FORTUNE)) {
+                if (hasEnchantment(item, SILK_TOUCH) && hasEnchantment(item, FORTUNE)) {
                     removeEnchantmentById(item, FORTUNE);
                     changed = true;
                 }
                 break;
+
             case Item.DIAMOND_AXE:
             case Item.NETHERITE_AXE:
             case Item.IRON_AXE:
             case Item.GOLD_AXE:
             case Item.STONE_AXE:
             case Item.WOODEN_AXE:
-                if (item.hasEnchantment(FIRE_ASPECT)) {
+                if (hasEnchantment(item, FIRE_ASPECT)) {
                     removeEnchantmentById(item, FIRE_ASPECT);
                     changed = true;
                 }
                 break;
+
             case Item.TRIDENT:
-                if (item.hasEnchantment(FIRE_ASPECT)) {
-                    removeEnchantmentById(item, FIRE_ASPECT);
-                    changed = true;
-                }
-                if (item.hasEnchantment(SHARPNESS)) {
-                    removeEnchantmentById(item, SHARPNESS);
-                    changed = true;
-                }
+                if (hasEnchantment(item, FIRE_ASPECT)) { removeEnchantmentById(item, FIRE_ASPECT); changed = true; }
+                if (hasEnchantment(item, SHARPNESS)) { removeEnchantmentById(item, SHARPNESS); changed = true; }
                 break;
+
             case Item.ELYTRA:
                 int[] invalid = {PROTECTION, FIRE_PROTECTION, FEATHER_FALLING, BLAST_PROTECTION, PROJECTILE_PROTECTION};
-                for (int pid : invalid) {
-                    if (item.hasEnchantment(pid)) {
-                        removeEnchantmentById(item, pid);
-                        changed = true;
-                    }
+                for (int pid : invalid) if (hasEnchantment(item, pid)) {
+                    removeEnchantmentById(item, pid);
+                    changed = true;
                 }
                 break;
         }
 
         return changed;
-    }
-
-    private void removeEnchantmentById(Item item, int id) {
-        Enchantment[] current = item.getEnchantments();
-        List<Enchantment> keep = new ArrayList<>();
-        for (Enchantment e : current) {
-            if (e.getId() != id) keep.add(e);
-        }
-        item.clearEnchantments();
-        for (Enchantment e : keep) item.addEnchantment(e);
     }
 
     // --- EVENTOS ---
@@ -228,9 +228,7 @@ public class EnchantControl extends PluginBase implements Listener {
         getServer().getScheduler().scheduleDelayedTask(this, () -> {
             if (fixItem(i)) {
                 inv.setItem(slot, i);
-                if (p != null && p.isOnline()) {
-                    p.getInventory().sendContents(p);
-                }
+                if (p != null && p.isOnline()) p.getInventory().sendContents(p);
             }
         }, 1);
     }
