@@ -4,6 +4,7 @@ import cn.nukkit.Player;
 import cn.nukkit.event.Listener;
 import cn.nukkit.event.EventHandler;
 import cn.nukkit.event.player.PlayerJoinEvent;
+import cn.nukkit.event.player.PlayerArmorChangeEvent;
 import cn.nukkit.event.inventory.InventoryOpenEvent;
 import cn.nukkit.event.inventory.InventoryClickEvent;
 import cn.nukkit.inventory.Inventory;
@@ -41,7 +42,6 @@ public class EnchantControl extends PluginBase implements Listener {
         getLogger().info("EnchantControl habilitado correctamente.");
     }
 
-    // --- UTILIDADES NBT ---
     private CompoundTag getOrCreateTag(Item item) {
         CompoundTag tag = item.getNamedTag();
         if (tag == null) {
@@ -75,15 +75,10 @@ public class EnchantControl extends PluginBase implements Listener {
         return false;
     }
 
-    // --- LÓGICA DE ENCANTAMIENTOS ---
     private boolean fixItem(Item item) {
         if (item == null || item.isNull()) return false;
         boolean changed = false;
-
-        if (!isArmor(item)) {
-            changed = fixNonArmor(item);
-        }
-
+        if (!isArmor(item)) changed = fixNonArmor(item);
         return changed;
     }
 
@@ -94,22 +89,21 @@ public class EnchantControl extends PluginBase implements Listener {
 
     private boolean fixArmor(Item item, Player player, int armorSlot) {
         if (item == null || item.isNull()) return false;
-
         boolean changed = false;
         int id = item.getId();
 
         int[] allowed = {PROTECTION, FIRE_PROTECTION, FEATHER_FALLING, BLAST_PROTECTION,
                 PROJECTILE_PROTECTION, THORNS, UNBREAKING, CURSE_OF_VANISHING, MENDING};
 
-        if (id == 298 || id == 302 || id == 306 || id == 310 || id == 314) {
+        if (id == 298 || id == 302 || id == 306 || id == 310 || id == 314) { // casco
             allowed = new int[]{PROTECTION, FIRE_PROTECTION, FEATHER_FALLING, BLAST_PROTECTION,
                     PROJECTILE_PROTECTION, THORNS, UNBREAKING, CURSE_OF_VANISHING, MENDING,
                     RESPIRATION, AQUA_AFFINITY};
-        } else if (id == 300 || id == 304 || id == 308 || id == 312 || id == 316) {
+        } else if (id == 300 || id == 304 || id == 308 || id == 312 || id == 316) { // pantalón
             allowed = new int[]{PROTECTION, FIRE_PROTECTION, FEATHER_FALLING, BLAST_PROTECTION,
                     PROJECTILE_PROTECTION, THORNS, UNBREAKING, CURSE_OF_VANISHING, MENDING,
                     SWIFT_SNEAK};
-        } else if (id == 301 || id == 305 || id == 309 || id == 313 || id == 317) {
+        } else if (id == 301 || id == 305 || id == 309 || id == 313 || id == 317) { // botas
             allowed = new int[]{PROTECTION, FIRE_PROTECTION, FEATHER_FALLING, BLAST_PROTECTION,
                     PROJECTILE_PROTECTION, THORNS, UNBREAKING, CURSE_OF_VANISHING, MENDING,
                     DEPTH_STRIDER, FROST_WALKER, SOUL_SPEED};
@@ -130,6 +124,7 @@ public class EnchantControl extends PluginBase implements Listener {
             item.setNamedTag(tag);
         }
 
+        // incompatibilidades
         if (hasEnchantment(item, FROST_WALKER) && hasEnchantment(item, DEPTH_STRIDER)) {
             removeEnchantmentById(item, FROST_WALKER);
             changed = true;
@@ -201,7 +196,6 @@ public class EnchantControl extends PluginBase implements Listener {
     }
 
     // --- EVENTOS ---
-
     @EventHandler
     public void onJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
@@ -216,6 +210,14 @@ public class EnchantControl extends PluginBase implements Listener {
             }
             if (changed) player.getInventory().sendContents(player);
         }, 1);
+    }
+
+    @EventHandler
+    public void onArmorChange(PlayerArmorChangeEvent event) {
+        Player player = event.getPlayer();
+        int slot = event.getSlot();
+        Item newArmor = event.getNewArmor();
+        if (newArmor != null && !newArmor.isNull()) fixArmor(newArmor, player, slot);
     }
 
     @EventHandler
