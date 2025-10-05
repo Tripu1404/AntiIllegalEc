@@ -143,8 +143,8 @@ public class EnchantControl extends PluginBase implements Listener {
 
         if (player != null && changed) {
             PlayerInventory inv = player.getInventory();
-            inv.setArmorItem(armorSlot, item);       // Actualiza solo la pieza de armadura
-            inv.sendArmorContents(player);           // Envia solo armadura, no todo el inventario
+            inv.setArmorItem(armorSlot, item);
+            inv.sendArmorContents(player);
         }
 
         return changed;
@@ -203,6 +203,7 @@ public class EnchantControl extends PluginBase implements Listener {
     @EventHandler
     public void onJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
+        // Inventario y armaduras del jugador
         for (Item i : player.getInventory().getContents().values()) fixItem(i);
         for (int slot = 0; slot < 4; slot++) {
             Item armor = player.getInventory().getArmorItem(slot);
@@ -213,7 +214,12 @@ public class EnchantControl extends PluginBase implements Listener {
     @EventHandler
     public void onInventoryOpen(InventoryOpenEvent event) {
         Inventory inv = event.getInventory();
-        for (Item i : inv.getContents().values()) fixItem(i);
+        // Recorre todos los items del inventario abierto
+        for (int slot : inv.getContents().keySet()) {
+            Item i = inv.getItem(slot);
+            if (i != null && !i.isNull()) fixItem(i);
+            inv.setItem(slot, i); // se asegura que el inventario refleje los cambios
+        }
     }
 
     @EventHandler
@@ -222,9 +228,14 @@ public class EnchantControl extends PluginBase implements Listener {
         Inventory inv = event.getInventory();
         int slot = event.getSlot();
         Item i = inv.getItem(slot);
-        if (i != null && !i.isNull()) fixItem(i);
 
-        // Revisar solo armaduras equipadas
+        // Corregir solo el item modificado
+        if (i != null && !i.isNull()) {
+            fixItem(i);
+            inv.setItem(slot, i);
+        }
+
+        // Revisar armaduras del jugador
         if (p != null) {
             PlayerInventory pinv = p.getInventory();
             for (int armorSlot = 0; armorSlot < 4; armorSlot++) {
