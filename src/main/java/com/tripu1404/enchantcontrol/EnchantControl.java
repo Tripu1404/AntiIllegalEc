@@ -13,8 +13,6 @@ import cn.nukkit.plugin.PluginBase;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
 
-import java.util.ArrayList;
-
 public class EnchantControl extends PluginBase implements Listener {
 
     private static final int PROTECTION = 0;
@@ -52,7 +50,8 @@ public class EnchantControl extends PluginBase implements Listener {
 
         ListTag<CompoundTag> enchList = tag.getList("ench", CompoundTag.class);
         ListTag<CompoundTag> newList = new ListTag<>("ench");
-        for (CompoundTag e : enchList) {
+        for (int i = 0; i < enchList.size(); i++) {
+            CompoundTag e = enchList.get(i);
             if (e.getShort("id") != id) newList.add(e);
         }
         tag.putList(newList);
@@ -63,8 +62,8 @@ public class EnchantControl extends PluginBase implements Listener {
         CompoundTag tag = item.getNamedTag();
         if (!tag.contains("ench")) return false;
         ListTag<CompoundTag> enchList = tag.getList("ench", CompoundTag.class);
-        for (CompoundTag e : enchList) {
-            if (e.getShort("id") == id) return true;
+        for (int i = 0; i < enchList.size(); i++) {
+            if (enchList.get(i).getShort("id") == id) return true;
         }
         return false;
     }
@@ -115,7 +114,8 @@ public class EnchantControl extends PluginBase implements Listener {
         if (tag.contains("ench")) {
             ListTag<CompoundTag> enchList = tag.getList("ench", CompoundTag.class);
             ListTag<CompoundTag> newList = new ListTag<>("ench");
-            for (CompoundTag e : enchList) {
+            for (int i = 0; i < enchList.size(); i++) {
+                CompoundTag e = enchList.get(i);
                 boolean allowedEnchant = false;
                 int eid = e.getShort("id");
                 for (int a : allowed) if (eid == a) allowedEnchant = true;
@@ -218,18 +218,4 @@ public class EnchantControl extends PluginBase implements Listener {
     }
 
     @EventHandler
-    public void onInventoryClick(InventoryClickEvent event) {
-        Player p = event.getPlayer();
-        Inventory inv = event.getInventory();
-        int slot = event.getSlot();
-        Item i = inv.getItem(slot);
-        if (i == null || i.isNull()) return;
-
-        getServer().getScheduler().scheduleDelayedTask(this, () -> {
-            if (fixItem(i)) {
-                inv.setItem(slot, i);
-                if (p != null && p.isOnline()) p.getInventory().sendContents(p);
-            }
-        }, 1);
-    }
-}
+   
