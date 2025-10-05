@@ -2,9 +2,9 @@ name: Build EnchantControl
 
 on:
   push:
-    branches:
-      - main
+    branches: [ "main" ]
   pull_request:
+    branches: [ "main" ]
 
 jobs:
   build:
@@ -12,32 +12,32 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
-      - name: Set up Java
-        uses: actions/setup-java@v3
+      - name: Set up JDK
+        uses: actions/setup-java@v4
         with:
-          distribution: 'temurin'
-          java-version: '17'
+          distribution: temurin
+          java-version: 17
 
-      - name: Download Nukkit
+      - name: Create directories
+        run: mkdir -p libs build/classes
+
+      - name: Download latest Nukkit JAR
         run: |
-          mkdir -p libs
           curl -L -o libs/nukkit.jar https://repo.opencollab.dev/maven-snapshots/cn/nukkit/nukkit/1.0-SNAPSHOT/nukkit-1.0-20251001.065813-1220.jar
-
-      - name: Create build directories
-        run: mkdir -p build/classes
-
-      - name: Compile Java files
+      - name: Compile plugin
         run: |
-          find src/main/java -name "*.java" > sources.txt
-          javac -cp libs/nukkit.jar -d build/classes @sources.txt
+          javac -cp libs/nukkit.jar -d build/classes src/main/java/com/tripu1404/enchantcontrol/EnchantControl.java
 
-      - name: Package JAR
+      - name: Package plugin JAR
         run: |
-          jar cf EnchantControl.jar -C build/classes .
+          jar cvf EnchantControl.jar -C build/classes/ . plugin.yml
 
-      - name: Upload artifact
+      - name: Verify JAR contents
+        run: jar tf EnchantControl.jar
+
+      - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
           name: EnchantControl
