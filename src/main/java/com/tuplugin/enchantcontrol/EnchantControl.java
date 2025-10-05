@@ -11,8 +11,6 @@ import cn.nukkit.item.Item;
 import cn.nukkit.item.enchantment.Enchantment;
 import cn.nukkit.plugin.PluginBase;
 
-import java.util.*;
-
 public class EnchantControl extends PluginBase implements Listener {
 
     // IDs definitivos
@@ -22,15 +20,20 @@ public class EnchantControl extends PluginBase implements Listener {
     private static final int BLAST_PROTECTION = 3;
     private static final int PROJECTILE_PROTECTION = 4;
     private static final int THORNS = 5;
-    private static final int UNBREAKING = 34;
-    private static final int DEPTH_STRIDER = 7;
-    private static final int FROST_WALKER = 25;
-    private static final int SOUL_SPEED = 36;
     private static final int RESPIRATION = 6;
+    private static final int DEPTH_STRIDER = 7;
     private static final int AQUA_AFFINITY = 8;
-    private static final int SWIFT_SNEAK = 37;
+    private static final int SHARPNESS = 9;
+    private static final int FIRE_ASPECT = 13;
+    private static final int SILK_TOUCH = 16;
+    private static final int FORTUNE = 18;
+    private static final int INFINITY = 22;
+    private static final int FROST_WALKER = 25;
     private static final int MENDING = 26;
     private static final int CURSE_OF_VANISHING = 28;
+    private static final int UNBREAKING = 34;
+    private static final int SOUL_SPEED = 36;
+    private static final int SWIFT_SNEAK = 37;
 
     @Override
     public void onEnable() {
@@ -38,7 +41,6 @@ public class EnchantControl extends PluginBase implements Listener {
         getLogger().info("EnchantControl habilitado!");
     }
 
-    // Fix general de items
     private void fixItem(Item item) {
         if (item == null || item.isNull()) return;
 
@@ -51,72 +53,79 @@ public class EnchantControl extends PluginBase implements Listener {
 
     private boolean isArmor(Item item) {
         int id = item.getId();
-        return (id >= 298 && id <= 317) || (id >= 300 && id <= 319); // Helm, Chest, Legs, Boots
+        // IDs de armaduras (casco, pechera, pantalón, botas)
+        return (id >= 298 && id <= 317);
     }
 
     private void fixArmor(Item item) {
         Enchantment[] enchants = item.getEnchantments();
-        Map<Integer, Enchantment> toKeep = new HashMap<>();
+        // Limpiar encantamientos no permitidos
+        for (Enchantment e : enchants) {
+            item.removeEnchantment(e.getId());
+        }
 
         int[] allowed = {PROTECTION, FIRE_PROTECTION, FEATHER_FALLING, BLAST_PROTECTION,
                 PROJECTILE_PROTECTION, THORNS, UNBREAKING, CURSE_OF_VANISHING, MENDING};
 
         int id = item.getId();
-        if (id == 298 || id == 302 || id == 306 || id == 310 || id == 314) { // Helmet
+        // Casco
+        if (id == 298 || id == 302 || id == 306 || id == 310 || id == 314) {
             allowed = new int[]{PROTECTION, FIRE_PROTECTION, FEATHER_FALLING, BLAST_PROTECTION,
                     PROJECTILE_PROTECTION, THORNS, UNBREAKING, CURSE_OF_VANISHING, MENDING,
                     RESPIRATION, AQUA_AFFINITY};
-        } else if (id == 300 || id == 304 || id == 308 || id == 312 || id == 316) { // Leggings
+        }
+        // Pantalones
+        else if (id == 300 || id == 304 || id == 308 || id == 312 || id == 316) {
             allowed = new int[]{PROTECTION, FIRE_PROTECTION, FEATHER_FALLING, BLAST_PROTECTION,
                     PROJECTILE_PROTECTION, THORNS, UNBREAKING, CURSE_OF_VANISHING, MENDING,
                     SWIFT_SNEAK};
-        } else if (id == 301 || id == 305 || id == 309 || id == 313 || id == 317) { // Boots
+        }
+        // Botas
+        else if (id == 301 || id == 305 || id == 309 || id == 313 || id == 317) {
             allowed = new int[]{PROTECTION, FIRE_PROTECTION, FEATHER_FALLING, BLAST_PROTECTION,
                     PROJECTILE_PROTECTION, THORNS, UNBREAKING, CURSE_OF_VANISHING, MENDING,
                     DEPTH_STRIDER, FROST_WALKER, SOUL_SPEED};
         }
 
-        // Mantener solo encantamientos permitidos
+        // Reaplicar solo los permitidos que ya estaban
         for (Enchantment e : enchants) {
             for (int a : allowed) {
                 if (e.getId() == a) {
-                    toKeep.put(a, e);
-                    break;
+                    item.addEnchantment(Enchantment.getEnchantment(e.getId(), e.getLevel()));
                 }
             }
         }
 
-        // Aplicar prioridades
-        applyArmorPriorities(toKeep);
-
-        // Limpiar y reaplicar
-        for (Enchantment e : enchants) {
-            item.removeEnchantment(e);
-        }
-        for (Enchantment e : toKeep.values()) {
-            item.addEnchantment(e);
-        }
+        applyArmorPriorities(item);
     }
 
-    private void applyArmorPriorities(Map<Integer, Enchantment> enchants) {
+    private void applyArmorPriorities(Item item) {
+        // Mantener solo la protección de mayor prioridad
         int[] priority = {PROTECTION, BLAST_PROTECTION, FIRE_PROTECTION, PROJECTILE_PROTECTION};
+        int keep = -1;
         for (int id : priority) {
-            if (enchants.containsKey(id)) {
-                for (int other : priority) {
-                    if (other != id) enchants.remove(other);
-                }
+            if (item.hasEnchantment(id)) {
+                keep = id;
                 break;
             }
         }
-        // Frost Walker vs Depth Strider
-        if (enchants.containsKey(FROST_WALKER) && enchants.containsKey(DEPTH_STRIDER)) {
-            enchants.remove(FROST_WALKER); // prioridad a Depth Strider
+        if (keep != -1) {
+            for (int id : priority) {
+                if (id != keep && item.hasEnchantment(id)) {
+                    removeEnchantment(item, id);
+                }
+            }
+        }
+
+        // Frost Walker vs Depth Strider en botas
+        if (item.hasEnchantment(FROST_WALKER) && item.hasEnchantment(DEPTH_STRIDER)) {
+            removeEnchantment(item, FROST_WALKER);
         }
     }
 
     private void fixNonArmor(Item item) {
+        if (item == null || item.isNull()) return;
         Enchantment[] enchants = item.getEnchantments();
-        if (enchants == null) return;
 
         switch (item.getId()) {
             case Item.BOW:
@@ -136,11 +145,11 @@ public class EnchantControl extends PluginBase implements Listener {
             case Item.GOLD_AXE:
             case Item.STONE_AXE:
             case Item.WOODEN_AXE:
-                removeEnchantment(item, Enchantment.FIRE_ASPECT);
+                removeEnchantment(item, FIRE_ASPECT);
                 break;
             case Item.TRIDENT:
-                removeEnchantment(item, Enchantment.FIRE_ASPECT);
-                removeEnchantment(item, Enchantment.SHARPNESS);
+                removeEnchantment(item, FIRE_ASPECT);
+                removeEnchantment(item, SHARPNESS);
                 break;
             case Item.ELYTRA:
                 removeEnchantment(item, PROTECTION);
@@ -153,52 +162,34 @@ public class EnchantControl extends PluginBase implements Listener {
     }
 
     private void handleMendingInfinity(Item item) {
-        boolean hasMending = false;
-        boolean hasInfinity = false;
-        for (Enchantment e : item.getEnchantments()) {
-            if (e.getId() == MENDING) hasMending = true;
-            if (e.getId() == Enchantment.INFINITY) hasInfinity = true;
-        }
+        boolean hasMending = item.hasEnchantment(MENDING);
+        boolean hasInfinity = item.hasEnchantment(INFINITY);
         if (hasMending && hasInfinity) removeEnchantment(item, MENDING);
     }
 
     private void handleSilkFortune(Item item) {
-        boolean hasSilk = false;
-        boolean hasFortune = false;
-        for (Enchantment e : item.getEnchantments()) {
-            if (e.getId() == Enchantment.SILK_TOUCH) hasSilk = true;
-            if (e.getId() == Enchantment.FORTUNE) hasFortune = true;
-        }
-        if (hasSilk && hasFortune) removeEnchantment(item, Enchantment.FORTUNE);
+        boolean hasSilk = item.hasEnchantment(SILK_TOUCH);
+        boolean hasFortune = item.hasEnchantment(FORTUNE);
+        if (hasSilk && hasFortune) removeEnchantment(item, FORTUNE);
     }
 
     private void removeEnchantment(Item item, int id) {
-        for (Enchantment e : item.getEnchantments()) {
-            if (e.getId() == id) {
-                item.removeEnchantment(e);
-                break;
-            }
+        if (item.hasEnchantment(id)) {
+            item.removeEnchantment(id);
         }
     }
 
-    // Eventos
     @EventHandler
     public void onJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
-        for (Item armor : player.getInventory().getArmorContents()) {
-            fixItem(armor);
-        }
-        for (Item i : player.getInventory().getContents().values()) {
-            fixItem(i);
-        }
+        for (Item i : player.getInventory().getContents().values()) fixItem(i);
+        for (Item i : player.getInventory().getArmorContents()) fixItem(i);
     }
 
     @EventHandler
     public void onInventoryOpen(InventoryOpenEvent event) {
         Inventory inv = event.getInventory();
-        for (Item i : inv.getContents().values()) {
-            fixItem(i);
-        }
+        for (Item i : inv.getContents().values()) fixItem(i);
     }
 
     @EventHandler
