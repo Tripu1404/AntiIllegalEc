@@ -109,7 +109,6 @@ public class EnchantControl extends PluginBase implements Listener {
                     DEPTH_STRIDER, FROST_WALKER, SOUL_SPEED};
         }
 
-        // Revisar cada encantamiento y eliminar los no permitidos
         CompoundTag tag = item.getNamedTag();
         if (tag.contains("ench")) {
             ListTag<CompoundTag> enchList = tag.getList("ench", CompoundTag.class);
@@ -218,4 +217,19 @@ public class EnchantControl extends PluginBase implements Listener {
     }
 
     @EventHandler
-   
+    public void onInventoryClick(InventoryClickEvent event) {
+        Player p = event.getPlayer();
+        Inventory inv = event.getInventory();
+        int slot = event.getSlot();
+        Item i = inv.getItem(slot);
+        if (i == null || i.isNull()) return;
+
+        getServer().getScheduler().scheduleDelayedTask(this, () -> {
+            if (fixItem(i)) {
+                inv.setItem(slot, i);
+                if (p != null && p.isOnline()) p.getInventory().sendContents(p);
+            }
+        }, 1);
+    }
+
+} // <- fin de la clase
