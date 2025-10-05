@@ -24,6 +24,8 @@ jobs:
         run: |
           mkdir -p libs
           curl -L -o libs/nukkit.jar https://repo.opencollab.dev/maven-snapshots/cn/nukkit/nukkit/1.0-SNAPSHOT/nukkit-1.0-20251001.065813-1220.jar
+
+      - name: Create build directories
         run: mkdir -p build/classes
 
       - name: Compile Java files
