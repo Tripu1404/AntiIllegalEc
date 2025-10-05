@@ -8,7 +8,6 @@ import cn.nukkit.event.inventory.InventoryOpenEvent;
 import cn.nukkit.event.inventory.InventoryClickEvent;
 import cn.nukkit.inventory.Inventory;
 import cn.nukkit.item.Item;
-import cn.nukkit.item.enchantment.Enchantment;
 import cn.nukkit.plugin.PluginBase;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
@@ -43,7 +42,6 @@ public class EnchantControl extends PluginBase implements Listener {
     }
 
     // --- UTILIDADES NBT ---
-
     private CompoundTag getOrCreateTag(Item item) {
         CompoundTag tag = item.getNamedTag();
         if (tag == null) {
@@ -78,7 +76,6 @@ public class EnchantControl extends PluginBase implements Listener {
     }
 
     // --- LÓGICA DE ENCANTAMIENTOS ---
-
     private boolean fixItem(Item item) {
         if (item == null || item.isNull()) return false;
         boolean changed = false;
@@ -96,28 +93,28 @@ public class EnchantControl extends PluginBase implements Listener {
     }
 
     private boolean fixArmor(Item item, Player player, int armorSlot) {
+        if (item == null || item.isNull()) return false;
+
         boolean changed = false;
         int id = item.getId();
 
-        // Encantamientos permitidos según tipo de armadura
         int[] allowed = {PROTECTION, FIRE_PROTECTION, FEATHER_FALLING, BLAST_PROTECTION,
                 PROJECTILE_PROTECTION, THORNS, UNBREAKING, CURSE_OF_VANISHING, MENDING};
 
-        if (id == 298 || id == 302 || id == 306 || id == 310 || id == 314) { // Casco
+        if (id == 298 || id == 302 || id == 306 || id == 310 || id == 314) {
             allowed = new int[]{PROTECTION, FIRE_PROTECTION, FEATHER_FALLING, BLAST_PROTECTION,
                     PROJECTILE_PROTECTION, THORNS, UNBREAKING, CURSE_OF_VANISHING, MENDING,
                     RESPIRATION, AQUA_AFFINITY};
-        } else if (id == 300 || id == 304 || id == 308 || id == 312 || id == 316) { // Pantalón
+        } else if (id == 300 || id == 304 || id == 308 || id == 312 || id == 316) {
             allowed = new int[]{PROTECTION, FIRE_PROTECTION, FEATHER_FALLING, BLAST_PROTECTION,
                     PROJECTILE_PROTECTION, THORNS, UNBREAKING, CURSE_OF_VANISHING, MENDING,
                     SWIFT_SNEAK};
-        } else if (id == 301 || id == 305 || id == 309 || id == 313 || id == 317) { // Botas
+        } else if (id == 301 || id == 305 || id == 309 || id == 313 || id == 317) {
             allowed = new int[]{PROTECTION, FIRE_PROTECTION, FEATHER_FALLING, BLAST_PROTECTION,
                     PROJECTILE_PROTECTION, THORNS, UNBREAKING, CURSE_OF_VANISHING, MENDING,
                     DEPTH_STRIDER, FROST_WALKER, SOUL_SPEED};
         }
 
-        // Filtrar todos los encantamientos
         CompoundTag tag = getOrCreateTag(item);
         if (tag.contains("ench")) {
             ListTag<CompoundTag> enchList = tag.getList("ench", CompoundTag.class);
@@ -133,7 +130,6 @@ public class EnchantControl extends PluginBase implements Listener {
             item.setNamedTag(tag);
         }
 
-        // Incompatibilidades
         if (hasEnchantment(item, FROST_WALKER) && hasEnchantment(item, DEPTH_STRIDER)) {
             removeEnchantmentById(item, FROST_WALKER);
             changed = true;
@@ -147,7 +143,6 @@ public class EnchantControl extends PluginBase implements Listener {
             changed = true;
         }
 
-        // Actualizar armadura en inventario
         if (player != null && changed) {
             player.getInventory().setArmorItem(armorSlot, item);
             player.getInventory().sendArmorContents(player);
@@ -167,7 +162,6 @@ public class EnchantControl extends PluginBase implements Listener {
                     changed = true;
                 }
                 break;
-
             case Item.DIAMOND_PICKAXE:
             case Item.NETHERITE_PICKAXE:
             case Item.IRON_PICKAXE:
@@ -179,7 +173,6 @@ public class EnchantControl extends PluginBase implements Listener {
                     changed = true;
                 }
                 break;
-
             case Item.DIAMOND_AXE:
             case Item.NETHERITE_AXE:
             case Item.IRON_AXE:
@@ -191,12 +184,10 @@ public class EnchantControl extends PluginBase implements Listener {
                     changed = true;
                 }
                 break;
-
             case Item.TRIDENT:
                 if (hasEnchantment(item, FIRE_ASPECT)) { removeEnchantmentById(item, FIRE_ASPECT); changed = true; }
                 if (hasEnchantment(item, SHARPNESS)) { removeEnchantmentById(item, SHARPNESS); changed = true; }
                 break;
-
             case Item.ELYTRA:
                 int[] invalid = {PROTECTION, FIRE_PROTECTION, FEATHER_FALLING, BLAST_PROTECTION, PROJECTILE_PROTECTION};
                 for (int pid : invalid) if (hasEnchantment(item, pid)) {
@@ -217,7 +208,7 @@ public class EnchantControl extends PluginBase implements Listener {
         getServer().getScheduler().scheduleDelayedTask(this, () -> {
             boolean changed = false;
             for (Item i : player.getInventory().getContents().values()) if (fixItem(i)) changed = true;
-            for (int slot = 0; slot < 4; slot++) { // Armadura
+            for (int slot = 0; slot < 4; slot++) {
                 Item armor = player.getInventory().getArmorItem(slot);
                 if (armor != null && !armor.isNull()) {
                     if (fixArmor(armor, player, slot)) changed = true;
@@ -245,4 +236,9 @@ public class EnchantControl extends PluginBase implements Listener {
 
         getServer().getScheduler().scheduleDelayedTask(this, () -> {
             if (fixItem(i)) {
-               
+                inv.setItem(slot, i);
+                if (p != null && p.isOnline()) p.getInventory().sendContents(p);
+            }
+        }, 1);
+    }
+}
