@@ -4,7 +4,6 @@ import cn.nukkit.Player;
 import cn.nukkit.event.Listener;
 import cn.nukkit.event.EventHandler;
 import cn.nukkit.event.player.PlayerJoinEvent;
-import cn.nukkit.event.inventory.InventoryOpenEvent;
 import cn.nukkit.event.inventory.InventoryClickEvent;
 import cn.nukkit.inventory.Inventory;
 import cn.nukkit.inventory.PlayerInventory;
@@ -203,22 +202,10 @@ public class EnchantControl extends PluginBase implements Listener {
     @EventHandler
     public void onJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
-        // Inventario y armaduras del jugador
         for (Item i : player.getInventory().getContents().values()) fixItem(i);
         for (int slot = 0; slot < 4; slot++) {
             Item armor = player.getInventory().getArmorItem(slot);
             if (armor != null && !armor.isNull()) fixArmor(armor, player, slot);
-        }
-    }
-
-    @EventHandler
-    public void onInventoryOpen(InventoryOpenEvent event) {
-        Inventory inv = event.getInventory();
-        // Recorre todos los items del inventario abierto
-        for (int slot : inv.getContents().keySet()) {
-            Item i = inv.getItem(slot);
-            if (i != null && !i.isNull()) fixItem(i);
-            inv.setItem(slot, i); // se asegura que el inventario refleje los cambios
         }
     }
 
@@ -229,10 +216,10 @@ public class EnchantControl extends PluginBase implements Listener {
         int slot = event.getSlot();
         Item i = inv.getItem(slot);
 
-        // Corregir solo el item modificado
+        // Solo corregir el item modificado
         if (i != null && !i.isNull()) {
-            fixItem(i);
-            inv.setItem(slot, i);
+            boolean changed = fixItem(i);
+            if (changed) inv.setItem(slot, i); // actualiza el slot sin duplicación
         }
 
         // Revisar armaduras del jugador
