@@ -53,45 +53,44 @@ public class EnchantControl extends PluginBase implements Listener {
 
     private boolean isArmor(Item item) {
         int id = item.getId();
-        // IDs de armaduras (casco, pechera, pantalón, botas)
-        return (id >= 298 && id <= 317);
+        return (id >= 298 && id <= 317); // casco, pechera, pantalón, botas
     }
 
     private void fixArmor(Item item) {
         Enchantment[] enchants = item.getEnchantments();
-        // Limpiar encantamientos no permitidos
-        for (Enchantment e : enchants) {
-            item.removeEnchantment(e.getId());
+        if (enchants != null) {
+            for (Enchantment e : enchants) {
+                e.setLevel(0); // eliminar todos
+            }
         }
 
         int[] allowed = {PROTECTION, FIRE_PROTECTION, FEATHER_FALLING, BLAST_PROTECTION,
                 PROJECTILE_PROTECTION, THORNS, UNBREAKING, CURSE_OF_VANISHING, MENDING};
 
         int id = item.getId();
-        // Casco
-        if (id == 298 || id == 302 || id == 306 || id == 310 || id == 314) {
+        if (id == 298 || id == 302 || id == 306 || id == 310 || id == 314) { // casco
             allowed = new int[]{PROTECTION, FIRE_PROTECTION, FEATHER_FALLING, BLAST_PROTECTION,
                     PROJECTILE_PROTECTION, THORNS, UNBREAKING, CURSE_OF_VANISHING, MENDING,
                     RESPIRATION, AQUA_AFFINITY};
-        }
-        // Pantalones
-        else if (id == 300 || id == 304 || id == 308 || id == 312 || id == 316) {
+        } else if (id == 300 || id == 304 || id == 308 || id == 312 || id == 316) { // pantalón
             allowed = new int[]{PROTECTION, FIRE_PROTECTION, FEATHER_FALLING, BLAST_PROTECTION,
                     PROJECTILE_PROTECTION, THORNS, UNBREAKING, CURSE_OF_VANISHING, MENDING,
                     SWIFT_SNEAK};
-        }
-        // Botas
-        else if (id == 301 || id == 305 || id == 309 || id == 313 || id == 317) {
+        } else if (id == 301 || id == 305 || id == 309 || id == 313 || id == 317) { // botas
             allowed = new int[]{PROTECTION, FIRE_PROTECTION, FEATHER_FALLING, BLAST_PROTECTION,
                     PROJECTILE_PROTECTION, THORNS, UNBREAKING, CURSE_OF_VANISHING, MENDING,
                     DEPTH_STRIDER, FROST_WALKER, SOUL_SPEED};
         }
 
-        // Reaplicar solo los permitidos que ya estaban
-        for (Enchantment e : enchants) {
-            for (int a : allowed) {
-                if (e.getId() == a) {
-                    item.addEnchantment(Enchantment.getEnchantment(e.getId(), e.getLevel()));
+        // reaplicar solo permitidos
+        if (enchants != null) {
+            for (Enchantment e : enchants) {
+                for (int a : allowed) {
+                    if (e.getId() == a) {
+                        Enchantment ne = Enchantment.getEnchantment(a);
+                        ne.setLevel(e.getLevel());
+                        item.addEnchantment(ne);
+                    }
                 }
             }
         }
@@ -100,7 +99,6 @@ public class EnchantControl extends PluginBase implements Listener {
     }
 
     private void applyArmorPriorities(Item item) {
-        // Mantener solo la protección de mayor prioridad
         int[] priority = {PROTECTION, BLAST_PROTECTION, FIRE_PROTECTION, PROJECTILE_PROTECTION};
         int keep = -1;
         for (int id : priority) {
@@ -112,20 +110,20 @@ public class EnchantControl extends PluginBase implements Listener {
         if (keep != -1) {
             for (int id : priority) {
                 if (id != keep && item.hasEnchantment(id)) {
-                    removeEnchantment(item, id);
+                    Enchantment e = Enchantment.getEnchantment(id);
+                    e.setLevel(0);
                 }
             }
         }
 
-        // Frost Walker vs Depth Strider en botas
         if (item.hasEnchantment(FROST_WALKER) && item.hasEnchantment(DEPTH_STRIDER)) {
-            removeEnchantment(item, FROST_WALKER);
+            Enchantment e = Enchantment.getEnchantment(FROST_WALKER);
+            e.setLevel(0);
         }
     }
 
     private void fixNonArmor(Item item) {
         if (item == null || item.isNull()) return;
-        Enchantment[] enchants = item.getEnchantments();
 
         switch (item.getId()) {
             case Item.BOW:
@@ -175,7 +173,8 @@ public class EnchantControl extends PluginBase implements Listener {
 
     private void removeEnchantment(Item item, int id) {
         if (item.hasEnchantment(id)) {
-            item.removeEnchantment(id);
+            Enchantment e = Enchantment.getEnchantment(id);
+            e.setLevel(0);
         }
     }
 
