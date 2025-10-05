@@ -11,9 +11,11 @@ import cn.nukkit.item.Item;
 import cn.nukkit.item.enchantment.Enchantment;
 import cn.nukkit.plugin.PluginBase;
 
+import java.util.ArrayList;
+import java.util.List;
+
 public class EnchantControl extends PluginBase implements Listener {
 
-    // IDs definitivos
     private static final int PROTECTION = 0;
     private static final int FIRE_PROTECTION = 1;
     private static final int FEATHER_FALLING = 2;
@@ -43,7 +45,6 @@ public class EnchantControl extends PluginBase implements Listener {
 
     private boolean fixItem(Item item) {
         if (item == null || item.isNull()) return false;
-
         boolean changed = false;
 
         if (isArmor(item)) {
@@ -86,6 +87,7 @@ public class EnchantControl extends PluginBase implements Listener {
                     DEPTH_STRIDER, FROST_WALKER, SOUL_SPEED};
         }
 
+        // eliminar los no permitidos
         for (Enchantment e : enchants) {
             boolean allowedEnchant = false;
             for (int a : allowed) {
@@ -95,30 +97,30 @@ public class EnchantControl extends PluginBase implements Listener {
                 }
             }
             if (!allowedEnchant) {
-                item.removeEnchantment(e.getId());
+                removeEnchantmentById(item, e.getId());
                 changed = true;
             }
         }
 
-        // Reglas de compatibilidad
+        // FROST_WALKER + DEPTH_STRIDER incompatibles
         if (item.hasEnchantment(FROST_WALKER) && item.hasEnchantment(DEPTH_STRIDER)) {
-            item.removeEnchantment(FROST_WALKER);
+            removeEnchantmentById(item, FROST_WALKER);
             changed = true;
         }
 
-        // Solo uno de los tipos de protección
-        int[] protectionGroup = {PROTECTION, BLAST_PROTECTION, FIRE_PROTECTION, PROJECTILE_PROTECTION};
+        // Solo una protección
+        int[] protGroup = {PROTECTION, BLAST_PROTECTION, FIRE_PROTECTION, PROJECTILE_PROTECTION};
         int keep = -1;
-        for (int pid : protectionGroup) {
+        for (int pid : protGroup) {
             if (item.hasEnchantment(pid)) {
                 keep = pid;
                 break;
             }
         }
         if (keep != -1) {
-            for (int pid : protectionGroup) {
+            for (int pid : protGroup) {
                 if (pid != keep && item.hasEnchantment(pid)) {
-                    item.removeEnchantment(pid);
+                    removeEnchantmentById(item, pid);
                     changed = true;
                 }
             }
@@ -134,11 +136,10 @@ public class EnchantControl extends PluginBase implements Listener {
         switch (id) {
             case Item.BOW:
                 if (item.hasEnchantment(MENDING) && item.hasEnchantment(INFINITY)) {
-                    item.removeEnchantment(MENDING);
+                    removeEnchantmentById(item, MENDING);
                     changed = true;
                 }
                 break;
-
             case Item.DIAMOND_PICKAXE:
             case Item.NETHERITE_PICKAXE:
             case Item.IRON_PICKAXE:
@@ -146,11 +147,10 @@ public class EnchantControl extends PluginBase implements Listener {
             case Item.STONE_PICKAXE:
             case Item.WOODEN_PICKAXE:
                 if (item.hasEnchantment(SILK_TOUCH) && item.hasEnchantment(FORTUNE)) {
-                    item.removeEnchantment(FORTUNE);
+                    removeEnchantmentById(item, FORTUNE);
                     changed = true;
                 }
                 break;
-
             case Item.DIAMOND_AXE:
             case Item.NETHERITE_AXE:
             case Item.IRON_AXE:
@@ -158,24 +158,25 @@ public class EnchantControl extends PluginBase implements Listener {
             case Item.STONE_AXE:
             case Item.WOODEN_AXE:
                 if (item.hasEnchantment(FIRE_ASPECT)) {
-                    item.removeEnchantment(FIRE_ASPECT);
+                    removeEnchantmentById(item, FIRE_ASPECT);
                     changed = true;
                 }
                 break;
-
             case Item.TRIDENT:
-                if (item.hasEnchantment(FIRE_ASPECT) || item.hasEnchantment(SHARPNESS)) {
-                    item.removeEnchantment(FIRE_ASPECT);
-                    item.removeEnchantment(SHARPNESS);
+                if (item.hasEnchantment(FIRE_ASPECT)) {
+                    removeEnchantmentById(item, FIRE_ASPECT);
+                    changed = true;
+                }
+                if (item.hasEnchantment(SHARPNESS)) {
+                    removeEnchantmentById(item, SHARPNESS);
                     changed = true;
                 }
                 break;
-
             case Item.ELYTRA:
                 int[] invalid = {PROTECTION, FIRE_PROTECTION, FEATHER_FALLING, BLAST_PROTECTION, PROJECTILE_PROTECTION};
                 for (int pid : invalid) {
                     if (item.hasEnchantment(pid)) {
-                        item.removeEnchantment(pid);
+                        removeEnchantmentById(item, pid);
                         changed = true;
                     }
                 }
@@ -183,6 +184,16 @@ public class EnchantControl extends PluginBase implements Listener {
         }
 
         return changed;
+    }
+
+    private void removeEnchantmentById(Item item, int id) {
+        Enchantment[] current = item.getEnchantments();
+        List<Enchantment> keep = new ArrayList<>();
+        for (Enchantment e : current) {
+            if (e.getId() != id) keep.add(e);
+        }
+        item.clearEnchantments();
+        for (Enchantment e : keep) item.addEnchantment(e);
     }
 
     // --- EVENTOS ---
@@ -212,14 +223,13 @@ public class EnchantControl extends PluginBase implements Listener {
         Inventory inv = event.getInventory();
         int slot = event.getSlot();
         Item i = inv.getItem(slot);
-
         if (i == null || i.isNull()) return;
 
         getServer().getScheduler().scheduleDelayedTask(this, () -> {
             if (fixItem(i)) {
                 inv.setItem(slot, i);
                 if (p != null && p.isOnline()) {
-                    p.getInventory().sendSlot(slot, i);
+                    p.getInventory().sendContents(p);
                 }
             }
         }, 1);
