@@ -4,17 +4,19 @@ import cn.nukkit.Player;
 import cn.nukkit.event.Listener;
 import cn.nukkit.event.EventHandler;
 import cn.nukkit.event.player.PlayerJoinEvent;
+import cn.nukkit.event.inventory.InventoryOpenEvent;
 import cn.nukkit.event.inventory.InventoryClickEvent;
 import cn.nukkit.inventory.Inventory;
-import cn.nukkit.inventory.PlayerInventory;
 import cn.nukkit.item.Item;
+import cn.nukkit.item.enchantment.Enchantment;
 import cn.nukkit.plugin.PluginBase;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
 
+import java.util.ArrayList;
+
 public class EnchantControl extends PluginBase implements Listener {
 
-    // IDs de encantamientos
     private static final int PROTECTION = 0;
     private static final int FIRE_PROTECTION = 1;
     private static final int FEATHER_FALLING = 2;
@@ -42,24 +44,15 @@ public class EnchantControl extends PluginBase implements Listener {
         getLogger().info("EnchantControl habilitado correctamente.");
     }
 
-    // --- NBT Utilities ---
-    private CompoundTag getOrCreateTag(Item item) {
-        CompoundTag tag = item.getNamedTag();
-        if (tag == null) {
-            tag = new CompoundTag();
-            item.setNamedTag(tag);
-        }
-        return tag;
-    }
+    // --- UTILIDADES NBT ---
 
     private void removeEnchantmentById(Item item, int id) {
-        CompoundTag tag = getOrCreateTag(item);
+        CompoundTag tag = item.getNamedTag();
         if (!tag.contains("ench")) return;
 
         ListTag<CompoundTag> enchList = tag.getList("ench", CompoundTag.class);
         ListTag<CompoundTag> newList = new ListTag<>("ench");
-        for (int i = 0; i < enchList.size(); i++) {
-            CompoundTag e = enchList.get(i);
+        for (CompoundTag e : enchList) {
             if (e.getShort("id") != id) newList.add(e);
         }
         tag.putList(newList);
@@ -67,20 +60,27 @@ public class EnchantControl extends PluginBase implements Listener {
     }
 
     private boolean hasEnchantment(Item item, int id) {
-        CompoundTag tag = getOrCreateTag(item);
+        CompoundTag tag = item.getNamedTag();
         if (!tag.contains("ench")) return false;
         ListTag<CompoundTag> enchList = tag.getList("ench", CompoundTag.class);
-        for (int i = 0; i < enchList.size(); i++) {
-            if (enchList.get(i).getShort("id") == id) return true;
+        for (CompoundTag e : enchList) {
+            if (e.getShort("id") == id) return true;
         }
         return false;
     }
 
-    // --- Item Fixers ---
+    // --- LÓGICA DE ENCANTAMIENTOS ---
+
     private boolean fixItem(Item item) {
         if (item == null || item.isNull()) return false;
         boolean changed = false;
-        if (!isArmor(item)) changed = fixNonArmor(item);
+
+        if (isArmor(item)) {
+            changed = fixArmor(item);
+        } else {
+            changed = fixNonArmor(item);
+        }
+
         return changed;
     }
 
@@ -89,36 +89,35 @@ public class EnchantControl extends PluginBase implements Listener {
         return (id >= 298 && id <= 317);
     }
 
-    private boolean fixArmor(Item item, Player player, int armorSlot) {
-        if (item == null || item.isNull()) return false;
+    private boolean fixArmor(Item item) {
         boolean changed = false;
         int id = item.getId();
 
         int[] allowed = {PROTECTION, FIRE_PROTECTION, FEATHER_FALLING, BLAST_PROTECTION,
                 PROJECTILE_PROTECTION, THORNS, UNBREAKING, CURSE_OF_VANISHING, MENDING};
 
-        if (id == 298 || id == 302 || id == 306 || id == 310 || id == 314) { // casco
+        if (id == 298 || id == 302 || id == 306 || id == 310 || id == 314) {
             allowed = new int[]{PROTECTION, FIRE_PROTECTION, FEATHER_FALLING, BLAST_PROTECTION,
                     PROJECTILE_PROTECTION, THORNS, UNBREAKING, CURSE_OF_VANISHING, MENDING,
                     RESPIRATION, AQUA_AFFINITY};
-        } else if (id == 300 || id == 304 || id == 308 || id == 312 || id == 316) { // pantalón
+        } else if (id == 300 || id == 304 || id == 308 || id == 312 || id == 316) {
             allowed = new int[]{PROTECTION, FIRE_PROTECTION, FEATHER_FALLING, BLAST_PROTECTION,
                     PROJECTILE_PROTECTION, THORNS, UNBREAKING, CURSE_OF_VANISHING, MENDING,
                     SWIFT_SNEAK};
-        } else if (id == 301 || id == 305 || id == 309 || id == 313 || id == 317) { // botas
+        } else if (id == 301 || id == 305 || id == 309 || id == 313 || id == 317) {
             allowed = new int[]{PROTECTION, FIRE_PROTECTION, FEATHER_FALLING, BLAST_PROTECTION,
                     PROJECTILE_PROTECTION, THORNS, UNBREAKING, CURSE_OF_VANISHING, MENDING,
                     DEPTH_STRIDER, FROST_WALKER, SOUL_SPEED};
         }
 
-        CompoundTag tag = getOrCreateTag(item);
+        // Revisar cada encantamiento y eliminar los no permitidos
+        CompoundTag tag = item.getNamedTag();
         if (tag.contains("ench")) {
             ListTag<CompoundTag> enchList = tag.getList("ench", CompoundTag.class);
             ListTag<CompoundTag> newList = new ListTag<>("ench");
-            for (int i = 0; i < enchList.size(); i++) {
-                CompoundTag e = enchList.get(i);
-                int eid = e.getShort("id");
+            for (CompoundTag e : enchList) {
                 boolean allowedEnchant = false;
+                int eid = e.getShort("id");
                 for (int a : allowed) if (eid == a) allowedEnchant = true;
                 if (allowedEnchant) newList.add(e); else changed = true;
             }
@@ -126,24 +125,19 @@ public class EnchantControl extends PluginBase implements Listener {
             item.setNamedTag(tag);
         }
 
-        // incompatibilidades
+        // FROST_WALKER + DEPTH_STRIDER incompatibles
         if (hasEnchantment(item, FROST_WALKER) && hasEnchantment(item, DEPTH_STRIDER)) {
             removeEnchantmentById(item, FROST_WALKER);
             changed = true;
         }
 
+        // Solo una protección
         int[] protGroup = {PROTECTION, BLAST_PROTECTION, FIRE_PROTECTION, PROJECTILE_PROTECTION};
         int keep = -1;
         for (int pid : protGroup) if (hasEnchantment(item, pid)) { keep = pid; break; }
         if (keep != -1) for (int pid : protGroup) if (pid != keep && hasEnchantment(item, pid)) {
             removeEnchantmentById(item, pid);
             changed = true;
-        }
-
-        if (player != null && changed) {
-            PlayerInventory inv = player.getInventory();
-            inv.setArmorItem(armorSlot, item);
-            inv.sendArmorContents(player);
         }
 
         return changed;
@@ -160,6 +154,7 @@ public class EnchantControl extends PluginBase implements Listener {
                     changed = true;
                 }
                 break;
+
             case Item.DIAMOND_PICKAXE:
             case Item.NETHERITE_PICKAXE:
             case Item.IRON_PICKAXE:
@@ -171,6 +166,7 @@ public class EnchantControl extends PluginBase implements Listener {
                     changed = true;
                 }
                 break;
+
             case Item.DIAMOND_AXE:
             case Item.NETHERITE_AXE:
             case Item.IRON_AXE:
@@ -182,10 +178,12 @@ public class EnchantControl extends PluginBase implements Listener {
                     changed = true;
                 }
                 break;
+
             case Item.TRIDENT:
                 if (hasEnchantment(item, FIRE_ASPECT)) { removeEnchantmentById(item, FIRE_ASPECT); changed = true; }
                 if (hasEnchantment(item, SHARPNESS)) { removeEnchantmentById(item, SHARPNESS); changed = true; }
                 break;
+
             case Item.ELYTRA:
                 int[] invalid = {PROTECTION, FIRE_PROTECTION, FEATHER_FALLING, BLAST_PROTECTION, PROJECTILE_PROTECTION};
                 for (int pid : invalid) if (hasEnchantment(item, pid)) {
@@ -199,14 +197,24 @@ public class EnchantControl extends PluginBase implements Listener {
     }
 
     // --- EVENTOS ---
+
     @EventHandler
     public void onJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
-        for (Item i : player.getInventory().getContents().values()) fixItem(i);
-        for (int slot = 0; slot < 4; slot++) {
-            Item armor = player.getInventory().getArmorItem(slot);
-            if (armor != null && !armor.isNull()) fixArmor(armor, player, slot);
-        }
+        getServer().getScheduler().scheduleDelayedTask(this, () -> {
+            boolean changed = false;
+            for (Item i : player.getInventory().getContents().values()) if (fixItem(i)) changed = true;
+            for (Item i : player.getInventory().getArmorContents()) if (fixItem(i)) changed = true;
+            if (changed) player.getInventory().sendContents(player);
+        }, 1);
+    }
+
+    @EventHandler
+    public void onInventoryOpen(InventoryOpenEvent event) {
+        Inventory inv = event.getInventory();
+        getServer().getScheduler().scheduleDelayedTask(this, () -> {
+            for (Item i : inv.getContents().values()) fixItem(i);
+        }, 1);
     }
 
     @EventHandler
@@ -215,20 +223,13 @@ public class EnchantControl extends PluginBase implements Listener {
         Inventory inv = event.getInventory();
         int slot = event.getSlot();
         Item i = inv.getItem(slot);
+        if (i == null || i.isNull()) return;
 
-        // Solo corregir el item modificado
-        if (i != null && !i.isNull()) {
-            boolean changed = fixItem(i);
-            if (changed) inv.setItem(slot, i); // actualiza el slot sin duplicación
-        }
-
-        // Revisar armaduras del jugador
-        if (p != null) {
-            PlayerInventory pinv = p.getInventory();
-            for (int armorSlot = 0; armorSlot < 4; armorSlot++) {
-                Item armor = pinv.getArmorItem(armorSlot);
-                if (armor != null && !armor.isNull()) fixArmor(armor, p, armorSlot);
+        getServer().getScheduler().scheduleDelayedTask(this, () -> {
+            if (fixItem(i)) {
+                inv.setItem(slot, i);
+                if (p != null && p.isOnline()) p.getInventory().sendContents(p);
             }
-        }
+        }, 1);
     }
 }
